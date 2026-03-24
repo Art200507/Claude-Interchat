@@ -1,0 +1,199 @@
+/* ── Theme tokens ────────────────────────────────────────────────────── */
+:host {
+  --bg:           #ffffff;
+  --bg-raised:    #f9f9f9;
+  --border:       #e5e5e5;
+  --text:         #1a1a1a;
+  --text-muted:   #737373;
+  --accent:       #8b5cf6;
+  --accent-hover: #7c3aed;
+  --ctx-bg:       #f5f3ff;
+  --ctx-text:     #5b21b6;
+  --ctx-border:   #ddd6fe;
+  --error:        #dc2626;
+  --radius:       14px;
+  --shadow:       0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  --font:         ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:host([data-theme="dark"]) {
+  --bg:           #1e1e1e;
+  --bg-raised:    #2a2a2a;
+  --border:       #3a3a3a;
+  --text:         #e5e5e5;
+  --text-muted:   #888888;
+  --ctx-bg:       #2d1f5e;
+  --ctx-text:     #c4b5fd;
+  --ctx-border:   #4c3d8a;
+  --shadow:       0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Card ────────────────────────────────────────────────────────────── */
+.ic-overlay {
+  width: 400px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+.ic-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.ic-header-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.ic-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: color 0.1s, background 0.1s;
+}
+.ic-close:hover { color: var(--text); background: var(--bg-raised); }
+
+/* ── Context snippet ─────────────────────────────────────────────────── */
+.ic-context {
+  margin: 12px 16px 0;
+  background: var(--ctx-bg);
+  border: 1px solid var(--ctx-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.ic-context-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.ic-context-text {
+  font-size: 13px;
+  color: var(--ctx-text);
+  font-style: italic;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Response area ───────────────────────────────────────────────────── */
+.ic-response {
+  flex: 1;
+  min-height: 56px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 12px 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.ic-response::-webkit-scrollbar { width: 4px; }
+.ic-response::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.ic-placeholder { color: var(--text-muted); font-style: italic; font-size: 13px; }
+
+.ic-error { color: var(--error); font-size: 13px; }
+
+/* ── Input row ───────────────────────────────────────────────────────── */
+.ic-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.ic-input {
+  flex: 1;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  line-height: 1.5;
+  padding: 8px 12px;
+  resize: none;
+  min-height: 38px;
+  max-height: 120px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.ic-input:focus { border-color: var(--accent); }
+.ic-input::placeholder { color: var(--text-muted); }
+
+.ic-send {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0 16px;
+  height: 38px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+.ic-send:hover:not(:disabled) { background: var(--accent-hover); }
+.ic-send:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Loading dots ────────────────────────────────────────────────────── */
+.ic-dots {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 4px 0;
+}
+.ic-dots span {
+  width: 7px; height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  animation: ic-bounce 1.2s ease-in-out infinite;
+}
+.ic-dots span:nth-child(2) { animation-delay: 0.2s; }
+.ic-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes ic-bounce {
+  0%, 80%, 100% { transform: scale(0.55); opacity: 0.35; }
+  40%            { transform: scale(1);   opacity: 1;    }
+}

@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "interChat",
+  "version": "1.0.0",
+  "description": "Ask follow-up questions about Claude's responses inline — ephemeral, no trace left behind.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://claude.ai/*"],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["src/content/main-world.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": [
+        "src/content/isolated-world.js",
+        "src/content/chat-history.js",
+        "src/content/api-client.js",
+        "src/content/streaming.js",
+        "src/content/selection-detector.js",
+        "src/content/trigger-button.js",
+        "src/content/overlay.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/styles/overlay.css", "icons/*.png"],
+      "matches": ["https://claude.ai/*"]
+    }
+  ],
+  "icons": {
+    "128": "icons/icon128.png"
+  }
+}
