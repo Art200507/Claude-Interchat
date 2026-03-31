@@ -13,6 +13,7 @@ window.__interChat = {
   orgId: null,
   apiBase: null,
   activeConversationId: null,
+  overlayTexts: new Set(),
 };
 
 console.log('[interChat] isolated-world loaded');

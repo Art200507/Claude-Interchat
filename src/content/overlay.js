@@ -40,13 +40,27 @@
     return _hl;
   }
 
+  // Collapsed overlay highlight — more opaque orange to signal "minimised"
+  let _hlCollapsed = null;
+  function getHLCollapsed() {
+    if (_hlCollapsed) return _hlCollapsed;
+    try {
+      if (!CSS.highlights || typeof Highlight === 'undefined') return null;
+      const s = document.createElement('style');
+      s.textContent = '::highlight(interchat-collapsed){background-color:rgba(249,115,22,.7);color:inherit;cursor:pointer}';
+      document.head.appendChild(s);
+      _hlCollapsed = new Highlight();
+      CSS.highlights.set('interchat-collapsed', _hlCollapsed);
+    } catch (_) {}
+    return _hlCollapsed;
+  }
+
   // ── Inline CSS — always dark/black + orange ──────────────────────────
   function makeCSS() {
     return `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 .ic{
-  width:${W}px;
   background:#111111;
   border:1px solid #2a2a2a;
   border-radius:14px;
@@ -58,6 +72,7 @@
   flex-direction:column;
   overflow:hidden;
   pointer-events:all;
+  position:relative;
 }
 
 .ic-head{
@@ -161,7 +176,22 @@
 @keyframes icb{
   0%,80%,100%{transform:scale(.55);opacity:.35}
   40%{transform:scale(1);opacity:1}
-}`;
+}
+.ic--sized .ic-msgs{max-height:none}
+.ic-resize{
+  position:absolute;right:0;bottom:0;
+  width:16px;height:16px;
+  cursor:nwse-resize;
+  display:flex;align-items:flex-end;justify-content:flex-end;
+  padding:3px;z-index:1;
+}
+.ic-resize::after{
+  content:'';display:block;
+  width:7px;height:7px;
+  border-right:2px solid #444;
+  border-bottom:2px solid #444;
+}
+.ic-resize:hover::after{border-color:#f97316}`;
   }
 
   // ── SSE parser ───────────────────────────────────────────────────────
@@ -277,15 +307,23 @@
   }
 
   function _createOverlay({ text, range }) {
+    window.__interChat.overlayTexts?.add(text);
+    const overlayName = 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]
+      + (1 + Math.floor(Math.random() * 9));
     let convId = null;
     let busy = false;
     let posX = 0, posY = 0;
     let dragging = false, dragOX = 0, dragOY = 0;
     let userDragged = false;
+    let cardW = W, cardH = null;
+    let resizeStartX = 0, resizeStartY = 0, resizeStartW = 0, resizeStartH = 0;
+    let collapsed = false;
+    let justDragged = false;
 
     // ── Host ────────────────────────────────────────────────────────────
     const host = document.createElement('div');
     host.setAttribute('data-interchat-overlay', '');
+    host.setAttribute('data-interchat-name', overlayName);
     Object.assign(host.style, {
       position: 'fixed',
       zIndex: '2147483646',
@@ -306,7 +344,7 @@
     card.style.background = '#111111'; // inline fallback
     card.innerHTML = `
       <div class="ic-head">
-        <span class="ic-brand">interChat</span>
+        <span class="ic-brand">${overlayName}</span>
         <div class="ic-head-right">
           <button class="ic-hist-btn" aria-label="Toggle chat history">History: OFF</button>
           <button class="ic-close" aria-label="Close">&#x2715;</button>
@@ -322,6 +360,11 @@
         <button class="ic-send">Send</button>
       </div>`;
     shadow.appendChild(card);
+
+    card.style.width = cardW + 'px';
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'ic-resize';
+    card.appendChild(resizeHandle);
 
     card.querySelector('.ic-ctx-txt').textContent = text;
     const msgsEl   = card.querySelector('.ic-msgs');
@@ -361,11 +404,12 @@
     function updateThread() {
       if (!range) return;
       try {
+        if (!svgLayer.isConnected) document.body.appendChild(svgLayer);
         const r = range.getBoundingClientRect();
         if (!r || r.width + r.height === 0) return;
         const ax = r.left + r.width / 2;
         const ay = r.top  + r.height / 2;
-        const cx = posX + W / 2;
+        const cx = posX + cardW / 2;
         const cy = posY;
         line.setAttribute('x1', String(ax)); line.setAttribute('y1', String(ay));
         line.setAttribute('x2', String(cx)); line.setAttribute('y2', String(cy));
@@ -381,6 +425,8 @@
 
     function setVisible(visible) {
       host.style.visibility  = visible ? '' : 'hidden';
+      // Re-attach SVG layer if Claude's SPA removed it from the document
+      if (!svgLayer.isConnected) document.body.appendChild(svgLayer);
       line.style.visibility  = visible ? '' : 'hidden';
       dot.style.visibility   = visible ? '' : 'hidden';
     }
@@ -393,14 +439,15 @@
         // Hide everything when the anchor text is scrolled out of the viewport
         const inView = r.bottom > 0 && r.top < window.innerHeight &&
                        r.right  > 0 && r.left < window.innerWidth;
-        setVisible(inView);
-        if (!inView) return;
+        setVisible(inView && !collapsed);
+        // Also skip repositioning while collapsed — reposition() via setCollapsed handles it
+        if (!inView || collapsed) return;
 
         if (!userDragged) {
           if (r.width + r.height === 0) return;
           let top  = r.bottom + OFFSET_Y;
           let left = r.left;
-          if (left + W > window.innerWidth - 8) left = window.innerWidth - W - 8;
+          if (left + cardW > window.innerWidth - 8) left = window.innerWidth - cardW - 8;
           if (left < 8) left = 8;
           if (top + 380 > window.innerHeight) {
             const above = r.top - OFFSET_Y - 380;
@@ -424,11 +471,14 @@
     // ── Drag ─────────────────────────────────────────────────────────────
     function onMouseMove(e) {
       if (!dragging) return;
-      posX = Math.max(0, Math.min(e.clientX - dragOX, window.innerWidth  - W - 2));
+      posX = Math.max(0, Math.min(e.clientX - dragOX, window.innerWidth  - cardW - 2));
       posY = Math.max(0, Math.min(e.clientY - dragOY, window.innerHeight - 50));
       applyPos();
     }
-    function onMouseUp() { dragging = false; }
+    function onMouseUp() {
+      if (dragging) { justDragged = true; requestAnimationFrame(() => { justDragged = false; }); }
+      dragging = false;
+    }
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup',   onMouseUp);
 
@@ -439,6 +489,60 @@
       dragOX = e.clientX - posX;
       dragOY = e.clientY - posY;
     });
+
+    // Resize via pointer capture — all move/up events route to the handle itself
+    resizeHandle.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      resizeHandle.setPointerCapture(e.pointerId);
+      resizeStartX = e.clientX;
+      resizeStartY = e.clientY;
+      resizeStartW = cardW;
+      resizeStartH = cardH || card.offsetHeight;
+    });
+    resizeHandle.addEventListener('pointermove', e => {
+      if (!resizeHandle.hasPointerCapture(e.pointerId)) return;
+      cardW = Math.max(280, Math.min(680, resizeStartW + (e.clientX - resizeStartX)));
+      cardH = Math.max(200, resizeStartH + (e.clientY - resizeStartY));
+      card.style.width  = cardW + 'px';
+      card.style.height = cardH + 'px';
+      card.classList.add('ic--sized');
+      updateThread();
+    });
+    resizeHandle.addEventListener('pointerup', e => {
+      resizeHandle.releasePointerCapture(e.pointerId);
+    });
+
+    // ── Collapse / expand on selected-text click ──────────────────────────
+    function isClickOnRange(clientX, clientY) {
+      if (!range) return false;
+      try {
+        return Array.from(range.getClientRects()).some(r =>
+          clientX >= r.left && clientX <= r.right &&
+          clientY >= r.top  && clientY <= r.bottom
+        );
+      } catch (_) { return false; }
+    }
+
+    function setCollapsed(val) {
+      collapsed = val;
+      if (range) {
+        try {
+          if (val) { getHL()?.delete(range); getHLCollapsed()?.add(range); }
+          else     { getHLCollapsed()?.delete(range); getHL()?.add(range); }
+        } catch (_) {}
+      }
+      // Let reposition() be the single source of truth for visibility
+      reposition();
+    }
+
+    function onDocClick(e) {
+      if (justDragged) return;
+      // Ignore clicks inside the overlay card itself
+      if (e.target?.closest?.('[data-interchat-overlay]')) return;
+      if (isClickOnRange(e.clientX, e.clientY)) setCollapsed(!collapsed);
+    }
+    document.addEventListener('click', onDocClick);
 
     // ── Keyboard isolation ────────────────────────────────────────────────
     // BUBBLE phase (not capture) so events reach inputEl first, then are
@@ -539,8 +643,10 @@
         document.removeEventListener('scroll', reposition, { capture: true });
         window.removeEventListener('resize', reposition);
         document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        if (range) { try { getHL()?.delete(range); } catch (_) {} }
+        document.removeEventListener('mouseup',   onMouseUp);
+        document.removeEventListener('click',     onDocClick);
+        window.__interChat.overlayTexts?.delete(text);
+        if (range) { try { getHL()?.delete(range); getHLCollapsed()?.delete(range); } catch (_) {} }
         line.remove(); dot.remove();
         if (convId) ApiClient.deleteConversation(convId);
         overlayStack.splice(overlayStack.indexOf(destroy), 1);

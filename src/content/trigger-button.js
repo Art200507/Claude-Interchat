@@ -47,13 +47,14 @@
   shadow.appendChild(button);
 
   let savedText = '';
-  let savedRect = null;
   let savedRange = null;
 
   document.addEventListener('interchat:text-selected', ({ detail }) => {
     savedText = detail.text;
-    savedRect = detail.rect;
     savedRange = detail.range || null;
+
+    // Don't show Ask if this text already has an active overlay
+    if (window.__interChat?.overlayTexts?.has(savedText)) return;
 
     // Use viewport-relative coords for position: fixed trigger host
     triggerHost.style.position = 'fixed';
@@ -65,7 +66,6 @@
   document.addEventListener('interchat:selection-cleared', () => {
     button.style.display = 'none';
     savedText = '';
-    savedRect = null;
     savedRange = null;
   });
 
