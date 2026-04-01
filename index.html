@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>interChat — Inline conversations on Claude</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange:       #ff5200;
+      --orange-dark:  #e03d00;
+      --orange-deep:  #c22e00;
+      --orange-light: #ff7033;
+      --orange-glow:  rgba(0,0,0,0.12);
+      --orange-glow2: rgba(0,0,0,0.07);
+      --bg:           #ff5200;
+      --bg-card:      rgba(0,0,0,0.13);
+      --bg-card2:     rgba(0,0,0,0.22);
+      --border:       rgba(0,0,0,0.18);
+      --border-faint: rgba(0,0,0,0.12);
+      --text:         #0a0a0a;
+      --text-muted:   #1e1e1e;
+      --text-dim:     #3a3a3a;
+      --font:         'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background:
+        radial-gradient(ellipse 70% 55% at 15% 25%, #ff7a00 0%, transparent 55%),
+        radial-gradient(ellipse 55% 60% at 85% 75%, #e03000 0%, transparent 50%),
+        radial-gradient(ellipse 80% 50% at 50% 110%, #ff3300 0%, transparent 45%),
+        #ff5200;
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Typography ───────────────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    /* ── Nav ──────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 48px;
+      background: rgba(0,0,0,0.22);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo-mark {
+      width: 30px; height: 30px;
+      background: var(--orange);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 900; color: #fff;
+      letter-spacing: -0.04em;
+      box-shadow: 0 0 18px rgba(249,115,22,0.5);
+    }
+
+    .nav-wordmark {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .nav-wordmark { color: #fff; }
+    .nav-wordmark span { color: #fff; font-weight: 900; }
+
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+
+    .nav-link {
+      font-size: 14px;
+      color: rgba(255,255,255,0.75);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-link:hover { color: #fff; }
+
+    .btn-install {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #0a0a0a;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.35);
+    }
+    .btn-install:hover {
+      background: #222;
+      transform: translateY(-1px);
+    }
+    .btn-install svg { flex-shrink: 0; }
+
+    /* ── Hero ─────────────────────────────────────────────────── */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 0 80px;
+    }
+
+    /* Full-page fixed Three.js canvas — sits behind everything */
+    #threejs-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    #threejs-bg canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Hero vignette — just a subtle edge darkening on orange */
+    #hero-vignette { display: none; }
+    #hero::after   { display: none; }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      max-width: 760px;
+      padding: 0 24px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid rgba(0,0,0,0.2);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+    }
+
+    .hero-badge-dot {
+      width: 6px; height: 6px;
+      background: #fff;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .hero-title {
+      font-size: clamp(72px, 14vw, 148px);
+      font-weight: 900;
+      line-height: 1.0;
+      letter-spacing: -0.05em;
+      margin-bottom: 28px;
+    }
+    .title-inter {
+      background: linear-gradient(160deg, #fff 0%, #ddd 28%, #fff 48%, #bbb 62%, #fff 78%, #ccc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      filter: drop-shadow(0 2px 16px rgba(255,255,255,0.6)) drop-shadow(0 0 40px rgba(255,255,255,0.25));
+    }
+    .title-chat {
+      background: linear-gradient(160deg, #1a1a1a 0%, #555 22%, #111 42%, #666 60%, #0a0a0a 80%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      filter: drop-shadow(0 3px 10px rgba(0,0,0,0.5));
+    }
+    /* Install modal */
+    .install-modal-bg {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    .install-modal-bg.open { display: flex; }
+    .install-modal {
+      background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px; padding: 40px 44px; max-width: 480px; width: 90%;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.7);
+      position: relative;
+    }
+    .install-modal h3 {
+      font-size: 22px; font-weight: 800; color: #fff;
+      margin-bottom: 6px; letter-spacing: -0.03em;
+    }
+    .install-modal .modal-sub {
+      font-size: 13px; color: rgba(255,255,255,0.45); margin-bottom: 32px;
+    }
+    .install-steps { display: flex; flex-direction: column; gap: 18px; margin-bottom: 32px; }
+    .install-step { display: flex; gap: 16px; align-items: flex-start; }
+    .step-n {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      background: #ff5200; color: #fff;
+      font-size: 12px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-text strong { display: block; color: #fff; font-size: 14px; margin-bottom: 2px; }
+    .step-text span { color: rgba(255,255,255,0.5); font-size: 12.5px; }
+    .modal-close {
+      position: absolute; top: 16px; right: 18px;
+      background: rgba(255,255,255,0.08); border: none; color: #fff;
+      width: 30px; height: 30px; border-radius: 50%; font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.16); }
+    .modal-gh-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 13px; border-radius: 12px;
+      background: #ff5200; color: #fff; font-size: 14px; font-weight: 700;
+      text-decoration: none; transition: background 0.15s;
+    }
+    .modal-gh-btn:hover { background: #e04800; }
+
+    .hero-sub {
+      font-size: clamp(14px, 1.8vw, 17px);
+      color: rgba(0,0,0,0.58);
+      max-width: 480px;
+      margin: 0 auto 44px;
+      line-height: 1.75;
+      font-weight: 400;
+    }
+
+    .hero-cta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: #0a0a0a;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 32px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+    }
+    .btn-primary:hover {
+      background: #222;
+      box-shadow: 0 6px 32px rgba(0,0,0,0.5);
+      transform: translateY(-2px);
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: rgba(0,0,0,0.10);
+      color: #0a0a0a;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: 12px;
+      text-decoration: none;
+      border: 1px solid rgba(0,0,0,0.20);
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-ghost:hover {
+      background: rgba(0,0,0,0.18);
+      transform: translateY(-1px);
+    }
+
+    /* ── Demo Preview ─────────────────────────────────────────── */
+    /* ── MacBook Air demo section ────────────────────────────── */
+    #demo {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px 110px;
+    }
+
+    .mb-wrap {
+      width: 100%;
+      max-width: 920px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      filter: drop-shadow(0 48px 96px rgba(0,0,0,0.55));
+    }
+
+    .mb-lid {
+      width: 100%;
+      background: linear-gradient(160deg, #2e2e30 0%, #1c1c1e 100%);
+      border-radius: 18px 18px 2px 2px;
+      padding: 13px 13px 7px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+    }
+
+    .mb-bezel {
+      background: #060606;
+      border-radius: 8px 8px 2px 2px;
+      overflow: hidden;
+      aspect-ratio: 16/10;
+      position: relative;
+    }
+
+    .mb-notch {
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 86px; height: 20px;
+      background: #1c1c1e;
+      border-radius: 0 0 10px 10px;
+      z-index: 10;
+    }
+
+    .mb-screen {
+      width: 100%; height: 100%;
+      background: #121212;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mb-base {
+      width: 107%;
+      height: 24px;
+      background: linear-gradient(180deg, #2c2c2e 0%, #161618 100%);
+      border-radius: 0 0 12px 12px;
+      position: relative;
+    }
+
+    .mb-base::after {
+      content: '';
+      position: absolute;
+      bottom: 6px; left: 50%;
+      transform: translateX(-50%);
+      width: 54px; height: 3px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 2px;
+    }
+
+    .chrome-bar {
+      background: #222;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .chrome-dots { display: flex; gap: 6px; }
+    .chrome-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .chrome-dot:nth-child(1) { background: #ff5f56; }
+    .chrome-dot:nth-child(2) { background: #ffbd2e; }
+    .chrome-dot:nth-child(3) { background: #27c93f; }
+
+    .chrome-url {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: monospace;
+    }
+
+    .chrome-body {
+      background: #121212;
+      padding: 32px 40px;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Fake Claude response text */
+    .fake-response {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #ccc;
+      max-width: 560px;
+    }
+
+    .fake-response p { margin-bottom: 12px; }
+
+    .selected-text {
+      background: rgba(249,115,22,0.35);
+      border-radius: 3px;
+      padding: 1px 0;
+      color: #fff;
+      cursor: pointer;
+      position: relative;
+    }
+
+    /* Floating Ask button */
+    .ask-btn {
+      position: absolute;
+      top: 148px;
+      left: 340px;
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: var(--font);
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(249,115,22,0.5);
+      letter-spacing: 0.03em;
+      animation: float-in 0.6s 1.2s both cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    @keyframes float-in {
+      from { opacity: 0; transform: translateY(6px) scale(0.9); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Fake overlay card */
+    .fake-overlay {
+      position: absolute;
+      top: 72px;
+      right: 30px;
+      width: 320px;
+      background: #1e1e1e;
+      border-radius: 14px;
+      border: 1px solid rgba(249,115,22,0.25);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      font-size: 13px;
+      overflow: hidden;
+      animation: slide-in 0.7s 1.6s both cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .fo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .fo-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--orange);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .fo-close {
+      width: 16px; height: 16px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      color: #888;
+    }
+
+    .fo-ctx {
+      margin: 10px 12px 0;
+      background: rgba(249,115,22,0.08);
+      border: 1px solid rgba(249,115,22,0.2);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 11px;
+      color: rgba(249,115,22,0.8);
+      font-style: italic;
+    }
+
+    .fo-resp {
+      padding: 10px 14px 12px;
+      color: #ccc;
+      line-height: 1.65;
+      font-size: 12.5px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .fo-input-row {
+      display: flex;
+      gap: 7px;
+      padding: 9px 10px;
+    }
+
+    .fo-input {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .fo-send {
+      background: var(--orange);
+      color: #fff;
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 11px;
+      font-weight: 600;
+      height: 30px;
+      display: flex; align-items: center;
+    }
+
+    /* SVG thread line */
+    .fake-thread {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: visible;
+      animation: line-in 0.5s 2s both ease-out;
+    }
+
+    @keyframes line-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .fake-thread line {
+      stroke: var(--orange);
+      stroke-width: 1.5;
+      stroke-dasharray: 4 3;
+      opacity: 0.5;
+    }
+
+    /* ── Section base ─────────────────────────────────────────── */
+    section {
+      padding: 100px 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-label {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,0.55);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 18px;
+    }
+
+    .section-sub {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 520px;
+      line-height: 1.65;
+    }
+
+    /* ── How It Works ─────────────────────────────────────────── */
+    #how {
+      position: relative;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2px;
+      margin-top: 60px;
+    }
+
+    .step {
+      background: var(--bg-card);
+      padding: 36px 32px;
+      border: 1px solid var(--border-faint);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .step:first-child { border-radius: 16px 0 0 16px; }
+    .step:last-child  { border-radius: 0 16px 16px 0; }
+
+    .step::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--orange), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .step:hover { border-color: rgba(249,115,22,0.25); }
+    .step:hover::before { opacity: 1; }
+
+    .step-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--orange);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      opacity: 0.7;
+    }
+
+    .step-icon {
+      width: 48px; height: 48px;
+      background: var(--orange-glow);
+      border: 1px solid rgba(249,115,22,0.2);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+      font-size: 22px;
+    }
+
+    .step h3 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    .step p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    /* ── Features Grid ────────────────────────────────────────── */
+    #features {
+      border-top: 1px solid var(--border-faint);
+    }
+
+    .features-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: end;
+      margin-bottom: 64px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border-faint);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border-faint);
+    }
+
+    .feat-card {
+      background: var(--bg-card);
+      padding: 32px 28px;
+      transition: background 0.2s;
+    }
+
+    .feat-card:hover { background: var(--bg-card2); }
+
+    .feat-card:nth-child(1) { border-radius: 16px 0 0 0; }
+    .feat-card:nth-child(3) { border-radius: 0 16px 0 0; }
+    .feat-card:nth-child(4) { border-radius: 0 0 0 16px; }
+    .feat-card:nth-child(6) { border-radius: 0 0 16px 0; }
+
+    .feat-icon {
+      width: 40px; height: 40px;
+      background: var(--orange-glow);
+      border: 1px solid rgba(249,115,22,0.2);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      margin-bottom: 18px;
+    }
+
+    .feat-card h4 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .feat-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ── Tech section ─────────────────────────────────────────── */
+    #tech {
+      border-top: 1px solid var(--border-faint);
+    }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    .tech-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-faint);
+      border-radius: 14px;
+      padding: 28px 26px;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tech-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 80px; height: 80px;
+      background: radial-gradient(circle at 100% 100%, rgba(249,115,22,0.12), transparent);
+    }
+
+    .tech-card:hover {
+      border-color: rgba(249,115,22,0.25);
+      background: var(--bg-card2);
+    }
+
+    .tech-tag {
+      display: inline-block;
+      background: rgba(249,115,22,0.12);
+      color: var(--orange-light);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 100px;
+      margin-bottom: 14px;
+    }
+
+    .tech-card h4 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .tech-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ── CTA Banner ───────────────────────────────────────────── */
+    #cta {
+      border-top: 1px solid var(--border-faint);
+      text-align: center;
+      padding: 120px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #cta::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px; height: 300px;
+      background: radial-gradient(ellipse, rgba(0,0,0,0.08), transparent 70%);
+      pointer-events: none;
+    }
+
+    #cta .section-title { max-width: 560px; margin: 0 auto 18px; }
+
+    #cta .section-sub { margin: 0 auto 44px; text-align: center; }
+
+    .cta-note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border-faint);
+      padding: 40px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .footer-logo-mark {
+      width: 24px; height: 24px;
+      background: var(--orange);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 900; color: #fff;
+    }
+
+    .footer-wordmark {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .footer-wordmark span { color: var(--orange); }
+
+    .footer-meta {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* ── Scrollbar ────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--orange-deep); }
+
+    /* ── Responsive ───────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .features-header { grid-template-columns: 1fr; gap: 24px; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
+      .step:first-child, .step:last-child { border-radius: 0; }
+      .steps { gap: 1px; }
+      footer { flex-direction: column; text-align: center; padding: 32px 20px; }
+      .ask-btn { display: none; }
+      .fake-overlay { width: 260px; right: 10px; top: 60px; }
+    }
+
+    @media (max-width: 560px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .chrome-body { padding: 20px; }
+    }
+
+    /* ── Divider ──────────────────────────────────────────────── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Full-page Three.js background ────────────────────────── -->
+  <div id="threejs-bg"></div>
+  <script>
+  (function () {
+    // Deterministic seeded random — same layout every load
+    function sr(s) { var x = Math.sin(s + 1) * 10000; return x - Math.floor(x); }
+
+    function buildScene() {
+      var container = document.getElementById('threejs-bg');
+      var W = window.innerWidth, H = window.innerHeight;
+
+      var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(W, H);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.25;
+      container.appendChild(renderer.domElement);
+
+      var scene  = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(70, W / H, 0.1, 100);
+      camera.position.set(0, 0, 9);
+
+      // ── Lighting — strong multi-angle to reveal glassy knot curves ─
+      scene.add(new THREE.AmbientLight(0xffeedd, 4.5));
+
+      // Warm orange top-left key — traces the knot curves with gold
+      var kl = new THREE.DirectionalLight(0xff8800, 9);
+      kl.position.set(-5, 6, 4); scene.add(kl);
+
+      // Cool blue-white fill — opposite side, defines silhouette
+      var fl = new THREE.DirectionalLight(0xaaccff, 5);
+      fl.position.set(6, -3, 3); scene.add(fl);
+
+      // White rim from behind — edge separation
+      var rl = new THREE.DirectionalLight(0xffffff, 4);
+      rl.position.set(0, -4, -5); scene.add(rl);
+
+      // Top-down white fill — catches the top loops of knots
+      var tl = new THREE.DirectionalLight(0xffffff, 3);
+      tl.position.set(0, 8, 2); scene.add(tl);
+
+      // ── Geometries — multiple knot topologies + polyhedra ────────
+      // Knot p/q variants: each gives a completely different silhouette
+      var gK1   = new THREE.TorusKnotGeometry(1, 0.36, 160, 18, 2, 3);   // trefoil
+      var gK2   = new THREE.TorusKnotGeometry(1, 0.26, 160, 14, 3, 5);   // layered star
+      var gK3   = new THREE.TorusKnotGeometry(1, 0.30, 140, 12, 5, 3);   // radiant star
+
+      // Polyhedral wireframes — abstract counterpoint to the organic knots
+      var gIco   = new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(1, 1));
+      var gDodec = new THREE.EdgesGeometry(new THREE.DodecahedronGeometry(1, 0));
+      var gOcta  = new THREE.EdgesGeometry(new THREE.OctahedronGeometry(1, 0));
+
+      // Rings — thin accent + fat sculptural
+      var gRingThin = new THREE.TorusGeometry(1, 0.022, 12, 72);
+      var gRingFat  = new THREE.TorusGeometry(1, 0.075, 20, 56);
+
+      // ── Materials ─────────────────────────────────────────────────
+      // Glassy black: MeshPhysicalMaterial with transmission = smoked glass.
+      // Low roughness keeps highlights sharp; partial opacity reveals the orange bg
+      // through the glass surface, making every curve of the knot visible.
+      var mKJet  = new THREE.MeshPhysicalMaterial({
+        color: 0x020202,
+        metalness: 0.55,
+        roughness: 0.05,
+        transmission: 0.12,
+        thickness: 1.2,
+        transparent: true,
+        opacity: 0.97,
+        envMapIntensity: 1.4,
+      });
+      var mKDark = new THREE.MeshPhysicalMaterial({
+        color: 0x030203,
+        metalness: 0.45,
+        roughness: 0.10,
+        transmission: 0.08,
+        thickness: 0.9,
+        transparent: true,
+        opacity: 0.95,
+        envMapIntensity: 1.1,
+      });
+      var mPolyB  = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.72 });
+      var mPolyW  = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42 });
+      var mRingB  = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.68 });
+      var mRingW  = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.38 });
+
+      // Geometry + material lookup arrays
+      // types 0-2 = knots (Mesh), 3-5 = polyhedra (LineSegments), 6-7 = rings (Mesh)
+      var geos  = [gK1, gK2, gK3, gIco, gDodec, gOcta, gRingThin, gRingFat];
+      var isMesh = [true, true, true, false, false, false, true, true];
+
+      // ── Curated manifest — [geoIdx, scale, px, py, pz, matVariant] ─
+      // matVariant 0 = black/jet, 1 = white/light
+      // Centre zone (x:±4, y:±3) kept clear for page content.
+      var manifest = [
+
+        // ── Hero knots — left & right, partially off-screen ──
+        [0,  1.30,  -8.0,  0.8,  -0.9,  0],   // left trefoil, jet black
+        [1,  1.05,   7.8, -0.6,  -0.6,  0],   // right star knot (3,5)
+
+        // ── Mid-size knots — different topologies ─────────────────
+        [2,  0.45,  -9.5,  4.5,   0.2,  0],   // radiant star, top-left
+        [0,  0.38,   6.8,  5.2,   0.5,  0],   // trefoil, top-right
+        [1,  0.34,   0.5, -7.0,   0.8,  0],   // star knot, bottom-centre
+
+        // ── Small accent knots ────────────────────────────────────
+        [2,  0.20,  -5.8, -5.2,   1.0,  0],   // radiant star, lower-left
+        [0,  0.16,   9.6,  2.8,   1.2,  0],   // tiny trefoil, right edge
+
+        // ── Polyhedral wireframes — geometric tension ─────────────
+        [3,  1.40,   8.2,  4.8,  -1.0,  1],   // icosahedron, top-right
+        [4,  1.00,  -7.2, -3.8,  -0.4,  0],   // dodecahedron, lower-left (black)
+        [5,  0.60,  -2.5,  6.8,   0.6,  1],   // octahedron, top-centre (white)
+        [3,  0.45,   5.5, -5.5,   0.9,  1],   // small icosa, lower-right (white)
+
+        // ── Rings — sculptural & accent ───────────────────────────
+        [7,  0.80,  -6.5,  5.5,   1.0,  0],   // fat ring, upper-left
+        [6,  0.55,   9.0, -4.2,   0.7,  1],   // thin ring, lower-right (white)
+        [7,  0.40,   3.8,  6.5,   1.3,  0],   // fat ring, top gap
+      ];
+
+      var objects = [];
+      for (var i = 0; i < manifest.length; i++) {
+        var m    = manifest[i];
+        var gIdx = m[0], sc = m[1], px = m[2], py = m[3], pz = m[4], mv = m[5];
+        var seed = i * 11;
+        var geo  = geos[gIdx];
+
+        var obj;
+        if (isMesh[gIdx]) {
+          var mat = (gIdx <= 2) ? (mv === 0 ? mKJet : mKDark) : (mv === 0 ? mRingB : mRingW);
+          obj = new THREE.Mesh(geo, mat);
+        } else {
+          obj = new THREE.LineSegments(geo, mv === 0 ? mPolyB : mPolyW);
+        }
+
+        obj.position.set(px, py, pz);
+        obj.scale.setScalar(sc);
+        obj.rotation.set(
+          sr(seed + 4) * Math.PI * 2,
+          sr(seed + 5) * Math.PI * 2,
+          sr(seed + 6) * Math.PI * 2
+        );
+
+        // Bigger objects rotate slower, smaller spin faster
+        var speedMult = 0.12 / Math.max(sc, 0.2);
+        obj.userData = {
+          rx: (sr(seed + 7)  - 0.5) * speedMult * 0.6,
+          ry: (sr(seed + 8)  - 0.5) * speedMult,
+          rz: (sr(seed + 9)  - 0.5) * speedMult * 0.4,
+          fp: sr(seed + 10)  * Math.PI * 2,
+          fs: 0.3  + sr(seed + 11) * 0.5,
+          fa: sc * 0.04,    // float amplitude scales with object size
+          by: py,
+        };
+
+        scene.add(obj);
+        objects.push(obj);
+      }
+
+      // ── Particle network — futuristic drifting nodes ──────────────
+      var PC = 750;
+      var ptPos  = new Float32Array(PC * 3);
+      var ptVel  = [];
+      for (var pi = 0; pi < PC; pi++) {
+        ptPos[pi*3]   = (sr(pi*7+200) - 0.5) * 34;
+        ptPos[pi*3+1] = (sr(pi*7+201) - 0.5) * 28;
+        ptPos[pi*3+2] = -4 - sr(pi*7+202) * 7;   // behind the 3-D objects
+        ptVel.push({
+          vx: (sr(pi*7+203) - 0.5) * 0.0022,
+          vy:  0.0004 + sr(pi*7+204) * 0.0010,   // slow upward drift
+        });
+      }
+
+      // Tiny white star particles
+      var ptGeo  = new THREE.BufferGeometry();
+      var ptAttr = new THREE.BufferAttribute(ptPos, 3);
+      ptAttr.setUsage(THREE.DynamicDrawUsage);
+      ptGeo.setAttribute('position', ptAttr);
+      scene.add(new THREE.Points(ptGeo, new THREE.PointsMaterial({
+        color: 0xffffff, size: 0.055, sizeAttenuation: true,
+        transparent: true, opacity: 0.52,
+      })));
+
+      // Larger cyan accent nodes — every 6th particle
+      var acCount = Math.ceil(PC / 6);
+      var acPos   = new Float32Array(acCount * 3);
+      var acIdx   = [];
+      for (var aci = 0; aci < acCount; aci++) {
+        var si = aci * 6;
+        acIdx.push(si);
+        acPos[aci*3]   = ptPos[si*3];
+        acPos[aci*3+1] = ptPos[si*3+1];
+        acPos[aci*3+2] = ptPos[si*3+2];
+      }
+      var acGeo  = new THREE.BufferGeometry();
+      var acAttr = new THREE.BufferAttribute(acPos, 3);
+      acAttr.setUsage(THREE.DynamicDrawUsage);
+      acGeo.setAttribute('position', acAttr);
+      scene.add(new THREE.Points(acGeo, new THREE.PointsMaterial({
+        color: 0x00d4ff, size: 0.16, sizeAttenuation: true,
+        transparent: true, opacity: 0.44,
+      })));
+
+      // Connection lines — randomly sampled nearby pairs
+      var netPairs = [];
+      for (var ni = 0; ni < 30000 && netPairs.length < 280; ni++) {
+        var na = Math.floor(sr(ni*3+500) * PC);
+        var nb = Math.floor(sr(ni*3+501) * PC);
+        if (na === nb) continue;
+        var ndx = ptPos[na*3]   - ptPos[nb*3];
+        var ndy = ptPos[na*3+1] - ptPos[nb*3+1];
+        if (ndx*ndx + ndy*ndy < 9.0) netPairs.push([na, nb]);
+      }
+      var nlPos  = new Float32Array(netPairs.length * 6);
+      var nlGeo  = new THREE.BufferGeometry();
+      var nlAttr = new THREE.BufferAttribute(nlPos, 3);
+      nlAttr.setUsage(THREE.DynamicDrawUsage);
+      nlGeo.setAttribute('position', nlAttr);
+      scene.add(new THREE.LineSegments(nlGeo,
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.11 })
+      ));
+
+      // ── Hover constellation — cyan lines spark between nearby particles ─
+      var MAX_HV = 120;
+      var hvPos  = new Float32Array(MAX_HV * 6);
+      var hvGeo  = new THREE.BufferGeometry();
+      var hvAttr = new THREE.BufferAttribute(hvPos, 3);
+      hvAttr.setUsage(THREE.DynamicDrawUsage);
+      hvGeo.setAttribute('position', hvAttr);
+      hvGeo.setDrawRange(0, 0);
+      var hoverLines = new THREE.LineSegments(hvGeo,
+        new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.50 })
+      );
+      scene.add(hoverLines);
+
+      // ── Mouse world-space projection ──────────────────────────────
+      var mouseWX = 0, mouseWY = 0;
+      var targetCamX = 0, targetCamY = 0;
+      var fov2 = Math.tan(35 * Math.PI / 180); // half-angle of 70° FOV
+      window.addEventListener('mousemove', function (e) {
+        var nx = (e.clientX / W)  *  2 - 1;
+        var ny = -((e.clientY / H) * 2 - 1);
+        // project to world plane at z=0 for a camera at z=9
+        mouseWX = nx * fov2 * (W / H) * 9;
+        mouseWY = ny * fov2 * 9;
+        targetCamX = nx * 1.8;
+        targetCamY = ny * 1.2;
+      });
+
+      // ── Animate ───────────────────────────────────────────────────
+      var t = 0;
+      function animate() {
+        requestAnimationFrame(animate);
+        t += 0.012;
+
+        // 3-D object rotation + float
+        for (var i = 0; i < objects.length; i++) {
+          var o = objects[i], u = o.userData;
+          o.rotation.x += u.rx;
+          o.rotation.y += u.ry;
+          o.rotation.z += u.rz;
+          o.position.y = u.by + Math.sin(t * u.fs + u.fp) * u.fa;
+        }
+
+        // Camera parallax — smoothly follows mouse
+        camera.position.x += (targetCamX - camera.position.x) * 0.04;
+        camera.position.y += (targetCamY - camera.position.y) * 0.04;
+        camera.lookAt(0, 0, 0);
+
+        // Particle drift + mouse repulsion
+        var REP_R2 = 18.0, REP_F = 0.10; // repulsion radius² = 4.2 units
+        for (var pi = 0; pi < PC; pi++) {
+          var dx = ptPos[pi*3]   - mouseWX;
+          var dy = ptPos[pi*3+1] - mouseWY;
+          var d2 = dx*dx + dy*dy;
+          if (d2 < REP_R2 && d2 > 0.01) {
+            var dInv = REP_F * (1.0 - d2 / REP_R2) / Math.sqrt(d2);
+            ptPos[pi*3]   += dx * dInv;
+            ptPos[pi*3+1] += dy * dInv;
+          }
+          ptPos[pi*3]   += ptVel[pi].vx;
+          ptPos[pi*3+1] += ptVel[pi].vy;
+          if (ptPos[pi*3]   >  17) ptPos[pi*3]   = -17;
+          if (ptPos[pi*3]   < -17) ptPos[pi*3]   =  17;
+          if (ptPos[pi*3+1] >  14) ptPos[pi*3+1] = -14;
+          if (ptPos[pi*3+1] < -14) ptPos[pi*3+1] =  14;
+        }
+        ptAttr.needsUpdate = true;
+
+        // Sync cyan accent nodes
+        for (var aci = 0; aci < acIdx.length; aci++) {
+          var si = acIdx[aci];
+          acPos[aci*3]   = ptPos[si*3];
+          acPos[aci*3+1] = ptPos[si*3+1];
+          acPos[aci*3+2] = ptPos[si*3+2];
+        }
+        acAttr.needsUpdate = true;
+
+        // Update static connection lines
+        for (var ki = 0; ki < netPairs.length; ki++) {
+          var pa = netPairs[ki][0], pb = netPairs[ki][1];
+          nlPos[ki*6]   = ptPos[pa*3];   nlPos[ki*6+1] = ptPos[pa*3+1]; nlPos[ki*6+2] = ptPos[pa*3+2];
+          nlPos[ki*6+3] = ptPos[pb*3];   nlPos[ki*6+4] = ptPos[pb*3+1]; nlPos[ki*6+5] = ptPos[pb*3+2];
+        }
+        nlAttr.needsUpdate = true;
+
+        // Hover constellation — find particles near cursor, connect them
+        var HZONE2 = 22.0; // radius ~4.7 units
+        var near = [];
+        for (var pi = 0; pi < PC && near.length < 22; pi++) {
+          var hx = ptPos[pi*3] - mouseWX, hy = ptPos[pi*3+1] - mouseWY;
+          if (hx*hx + hy*hy < HZONE2) near.push(pi);
+        }
+        var hvCount = 0;
+        for (var hi = 0; hi < near.length && hvCount < MAX_HV; hi++) {
+          for (var hj = hi + 1; hj < near.length && hvCount < MAX_HV; hj++) {
+            var ha = near[hi], hb = near[hj];
+            hvPos[hvCount*6]   = ptPos[ha*3];   hvPos[hvCount*6+1] = ptPos[ha*3+1]; hvPos[hvCount*6+2] = ptPos[ha*3+2];
+            hvPos[hvCount*6+3] = ptPos[hb*3];   hvPos[hvCount*6+4] = ptPos[hb*3+1]; hvPos[hvCount*6+5] = ptPos[hb*3+2];
+            hvCount++;
+          }
+        }
+        hvGeo.setDrawRange(0, hvCount * 2);
+        hvAttr.needsUpdate = true;
+
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // ── Resize ────────────────────────────────────────────────────
+      window.addEventListener('resize', function () {
+        W = window.innerWidth; H = window.innerHeight;
+        camera.aspect = W / H;
+        camera.updateProjectionMatrix();
+        renderer.setSize(W, H);
+      });
+    }
+
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js';
+    s.onload = buildScene;
+    document.head.appendChild(s);
+  })();
+  </script>
+
+  <!-- ── Nav ───────────────────────────────────────────────────── -->
+  <nav>
+    <a href="#" class="nav-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" rx="9" fill="#ff5200"/>
+        <!-- Chat bubble -->
+        <path d="M7 8.5C7 7.12 8.12 6 9.5 6h13C23.88 6 25 7.12 25 8.5v9C25 18.88 23.88 20 22.5 20H18l-4 4v-4H9.5C8.12 20 7 18.88 7 17.5v-9z" fill="white"/>
+        <!-- Lightning bolt / link arrow inside bubble -->
+        <path d="M17.5 9.5l-4 4.5h3.2l-1.2 4 4.5-5.2h-3.2z" fill="#ff5200"/>
+      </svg>
+      <span class="nav-wordmark">inter<span>Chat</span></span>
+    </a>
+    <div class="nav-right">
+      <a href="#how" class="nav-link">How it works</a>
+      <a href="#features" class="nav-link">Features</a>
+      <a href="#tech" class="nav-link">Tech</a>
+      <a href="https://github.com/Art200507/Claude-Interchat" target="_blank" class="btn-install">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.02 10.02 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+  </nav>
+
+  <!-- ── Hero ──────────────────────────────────────────────────── -->
+  <section id="hero">
+
+    <!-- Hero vignette only — 3D canvas is now full-page fixed -->
+    <div id="hero-vignette"></div>
+
+    <div class="hero-content">
+
+      <h1 class="hero-title"><span class="title-inter">Inter</span><span class="title-chat">Chat</span></h1>
+
+      <p class="hero-sub">
+        Select text in any Claude response.<br>
+        Ask follow-ups in a floating overlay — anchored to your selection,<br>
+        deleted the moment you dismiss.
+      </p>
+
+      <div class="hero-cta">
+        <a href="#" class="btn-primary" onclick="document.getElementById('installModal').classList.add('open');return false;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install Extension
+        </a>
+        <a href="#how" class="btn-ghost">
+          See how it works
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </a>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── MacBook Air demo ───────────────────────────────────────── -->
+  <section id="demo">
+    <div class="mb-wrap">
+      <div class="mb-lid">
+        <div class="mb-bezel">
+          <div class="mb-notch"></div>
+          <div class="mb-screen">
+            <img src="assets/demo.png" alt="interChat in action"
+                 style="width:100%;height:100%;object-fit:cover;object-position:top left;display:block;">
+          </div>
+        </div>
+      </div>
+      <div class="mb-base"></div>
+    </div>
+  </section>
+
+  <!-- ── How It Works ───────────────────────────────────────────── -->
+  <section id="how">
+    <div>
+      <span class="section-label">How it works</span>
+      <h2 class="section-title">Four steps to<br>a deeper answer</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-icon">🖱️</div>
+        <h3>Select text</h3>
+        <p>Highlight any part of Claude's response. The extension watches for selections inside message blocks.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-icon">💬</div>
+        <h3>Click Ask</h3>
+        <p>A floating orange button appears just below your selection. Click it — the selected text is highlighted and an overlay opens.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-icon">⚡</div>
+        <h3>Get an answer</h3>
+        <p>Type your question. interChat uses your existing Claude session to send a message and streams the response live, token by token.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <div class="step-icon">🗑️</div>
+        <h3>Dismiss &amp; vanish</h3>
+        <p>Close the overlay. The conversation is immediately deleted from Claude's backend. Zero trace in your history.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ───────────────────────────────────────────────── -->
+  <section id="features">
+    <div class="features-header">
+      <div>
+        <span class="section-label">Features</span>
+        <h2 class="section-title">Built for deep reading sessions</h2>
+      </div>
+      <p class="section-sub">
+        Every design decision optimises for one thing: staying in flow while exploring complex ideas.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon">🧵</div>
+        <h4>Anchored overlays</h4>
+        <p>Each overlay is connected to its source text via a thread line. Stays anchored on scroll, hides when text leaves the viewport.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">✦</div>
+        <h4>Multiple at once</h4>
+        <p>Open overlays on different parts of the page simultaneously. Each is completely independent with its own conversation.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🟠</div>
+        <h4>Collapse &amp; expand</h4>
+        <p>Click the highlighted text to collapse an overlay to just its orange highlight. Click again to restore it exactly where you left it.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📜</div>
+        <h4>Chat history</h4>
+        <p>Toggle history mode to give Claude context from the current conversation tab. Or keep it off for pure focused follow-ups.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">↔️</div>
+        <h4>Resizable</h4>
+        <p>Drag the bottom-right corner to resize any overlay. Your layout, your preference.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📝</div>
+        <h4>Markdown rendering</h4>
+        <p>Responses render fully — bold, italic, tables, code blocks, headings, lists. Claude's output looks exactly as intended.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tech ─────────────────────────────────────────────────���─── -->
+  <section id="tech">
+    <span class="section-label">Under the hood</span>
+    <h2 class="section-title">Genuinely hard problems,<br>solved cleanly</h2>
+    <p class="section-sub" style="margin-bottom:0">
+      No API keys. No backend. No build step. Pure browser APIs and Chrome's extension model.
+    </p>
+
+    <div class="tech-grid">
+      <div class="tech-card">
+        <span class="tech-tag">Security model</span>
+        <h4>Dual-world architecture</h4>
+        <p>A MAIN-world script monkey-patches <code style="color:var(--orange-light);font-size:12px">window.fetch</code> before React loads to extract the org ID — then bridges it to the isolated content script via <code style="color:var(--orange-light);font-size:12px">postMessage</code>. Chrome's security boundary, navigated correctly.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tech-tag">Zero API key</span>
+        <h4>Session reuse</h4>
+        <p>All requests are same-origin fetches from the isolated content script. The browser automatically attaches your Claude session cookies. No credentials stored anywhere.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tech-tag">CSS Highlight API</span>
+        <h4>Non-destructive highlighting</h4>
+        <p>Selected text is highlighted using <code style="color:var(--orange-light);font-size:12px">CSS.highlights</code> and <code style="color:var(--orange-light);font-size:12px">new Highlight()</code> — a bleeding-edge browser API that paints highlights without touching the DOM at all.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tech-tag">Shadow DOM</span>
+        <h4>Full CSS isolation</h4>
+        <p>Every overlay lives in a closed Shadow DOM. Inline CSS (not a link tag) because async stylesheet loading caused transparent overlays. Claude's global styles can't leak in.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tech-tag">SVG + Range API</span>
+        <h4>Live thread lines</h4>
+        <p>Thread lines are drawn on a shared SVG layer using live <code style="color:var(--orange-light);font-size:12px">Range.getBoundingClientRect()</code> calls on every scroll frame. When Claude's SPA detaches the layer, an <code style="color:var(--orange-light);font-size:12px">isConnected</code> guard re-attaches it.</p>
+      </div>
+      <div class="tech-card">
+        <span class="tech-tag">SSE Streaming</span>
+        <h4>Token-by-token responses</h4>
+        <p>Reads Claude's <code style="color:var(--orange-light);font-size:12px">text/event-stream</code> response using a <code style="color:var(--orange-light);font-size:12px">ReadableStream</code> reader. Accumulates and splits on <code style="color:var(--orange-light);font-size:12px">\n\n</code>, extracts delta tokens, appends live to the UI.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ────────────────────────────────────────────────────── -->
+  <section id="cta">
+    <span class="section-label">Get started</span>
+    <h2 class="section-title">Stop switching tabs.<br>Ask in context.</h2>
+    <p class="section-sub">
+      Works with your existing Claude account. No sign-up, no API key, nothing to configure.
+    </p>
+    <div>
+      <a href="#" class="btn-primary" style="font-size:16px;padding:16px 40px;display:inline-flex;gap:10px;align-items:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Install interChat for Chrome
+      </a>
+    </div>
+    <p class="cta-note">Free · Open source · claude.ai only</p>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <footer>
+    <a href="#" class="footer-logo">
+      <div class="footer-logo-mark">iC</div>
+      <span class="footer-wordmark">inter<span>Chat</span></span>
+    </a>
+    <span class="footer-meta">Built for people who read deeply and think carefully.</span>
+  </footer>
+
+  <!-- ── Install modal ─────────────────────────────────────────── -->
+  <div class="install-modal-bg" id="installModal" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="install-modal">
+      <button class="modal-close" onclick="document.getElementById('installModal').classList.remove('open')">×</button>
+      <h3>Install interChat</h3>
+      <p class="modal-sub">No Chrome Web Store — load it directly in 60 seconds.</p>
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="step-n">1</div>
+          <div class="step-text">
+            <strong>Clone the repo</strong>
+            <span>git clone https://github.com/Art200507/Claude-Interchat</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="step-n">2</div>
+          <div class="step-text">
+            <strong>Open Chrome Extensions</strong>
+            <span>Navigate to chrome://extensions in your browser</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="step-n">3</div>
+          <div class="step-text">
+            <strong>Enable Developer Mode</strong>
+            <span>Toggle the switch in the top-right corner</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="step-n">4</div>
+          <div class="step-text">
+            <strong>Load Unpacked</strong>
+            <span>Click "Load unpacked" and select the cloned folder</span>
+          </div>
+        </div>
+        <div class="install-step">
+          <div class="step-n">5</div>
+          <div class="step-text">
+            <strong>All set!</strong>
+            <span>Open claude.ai, select any text, and click Ask ✦</span>
+          </div>
+        </div>
+      </div>
+      <a href="https://github.com/Art200507/Claude-Interchat" target="_blank" class="modal-gh-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.85-2.34 4.7-4.57 4.94.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10.02 10.02 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>
